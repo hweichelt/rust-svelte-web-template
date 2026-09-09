@@ -1,0 +1,55 @@
+# Reads ./.env for ${VAR} substitution. Values that differ inside the compose
+# network are set inline and take precedence over env_file.
+services:
+  db:
+    image: postgres:17
+    container_name: myapp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-myapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-myapp}
+      POSTGRES_DB: ${POSTGRES_DB:-myapp}
+    ports:
+      # Published so local `cargo run` / `cargo test` can reach it.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5434}:5432"
+    volumes:
+      - ./data/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myapp} -d ${POSTGRES_DB:-myapp}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: myapp-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-myapp}:${POSTGRES_PASSWORD:-myapp}@db:5432/${POSTGRES_DB:-myapp}
+      BIND_ADDR: 0.0.0.0:3000
+      CORS_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:8080}
+    ports:
+      - "127.0.0.1:${BACKEND_HOST_PORT:-3001}:3000"
+
+  frontend:
+    build: ./frontend
+    container_name: myapp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # Deliberately no env_file: the frontend needs nothing from it and should
+    # not carry database credentials.
+    environment:
+      # The SvelteKit server talks to the backend over the compose network.
+      API_URL: http://backend:3000
+      # Origin SvelteKit accepts form posts from; must be the URL users open.
+      ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-8080}:3000"
