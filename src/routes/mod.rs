@@ -1,44 +1,27 @@
 pub mod auth;
 pub mod health;
 
-use anyhow::Context;
 use axum::{
     Router,
-    http::{HeaderValue, Method, header},
-    routing::get,
+    routing::{any, get},
 };
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 
-use crate::state::AppState;
+use crate::{error::AppError, state::AppState};
 
-pub fn router(state: AppState) -> anyhow::Result<Router> {
-    let origins = state
-        .config
-        .cors_origins
-        .iter()
-        .map(|origin| {
-            origin
-                .parse::<HeaderValue>()
-                .with_context(|| format!("invalid CORS origin {origin:?}"))
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    let cors = CorsLayer::new()
-        .allow_origin(origins)
-        .allow_credentials(true)
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::PATCH,
-            Method::DELETE,
-        ])
-        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
-
-    Ok(Router::new()
+/// The JSON API. The frontend is served from the same origin, so there is no
+/// CORS layer; `SameSite=Lax` on the session cookie and JSON-only request
+/// bodies keep cross-site requests out.
+pub fn router(state: AppState) -> Router {
+    Router::new()
         .route("/health", get(health::health))
         .nest("/api/auth", auth::router())
+        // Unknown API paths get a JSON 404 rather than the SPA shell.
+        .route("/api/{*path}", any(not_found))
         .layer(TraceLayer::new_for_http())
-        .layer(cors)
-        .with_state(state))
+        .with_state(state)
+}
+
+async fn not_found() -> AppError {
+    AppError::NotFound("no such endpoint".to_owned())
 }

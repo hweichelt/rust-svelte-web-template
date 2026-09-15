@@ -20,9 +20,10 @@ services:
       timeout: 3s
       retries: 10
 
-  backend:
+  # API and web app in one binary.
+  app:
     build: .
-    container_name: myapp-backend
+    container_name: myapp-app
     restart: unless-stopped
     depends_on:
       db:
@@ -32,24 +33,5 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-myapp}:${POSTGRES_PASSWORD:-myapp}@db:5432/${POSTGRES_DB:-myapp}
       BIND_ADDR: 0.0.0.0:3000
-      CORS_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:8080}
     ports:
-      - "127.0.0.1:${BACKEND_HOST_PORT:-3001}:3000"
-
-  frontend:
-    build: ./frontend
-    container_name: myapp-frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    # Deliberately no env_file: the frontend needs nothing from it and should
-    # not carry database credentials.
-    environment:
-      # The SvelteKit server talks to the backend over the compose network.
-      API_URL: http://backend:3000
-      # Origin SvelteKit accepts form posts from; must be the URL users open.
-      ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      PORT: "3000"
-    ports:
-      - "127.0.0.1:${FRONTEND_HOST_PORT:-8080}:3000"
+      - "127.0.0.1:${APP_HOST_PORT:-8080}:3000"

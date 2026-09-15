@@ -1,33 +1,29 @@
-import { env } from '$env/dynamic/private';
 import type { ApiErrorBody } from '$lib/types';
 
-const API_URL = (env.API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
-
 export type ApiResult<T> =
-	| { ok: true; status: number; data: T; response: Response }
-	| { ok: false; status: number; error: ApiErrorBody };
+	{ ok: true; status: number; data: T } | { ok: false; status: number; error: ApiErrorBody };
 
 type ApiOptions = {
 	method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 	body?: unknown;
-	token?: string | null;
+	/** Pass the `fetch` given to a `load` function so SvelteKit can track it. */
+	fetch?: typeof fetch;
 };
 
 /**
- * Call the backend from the SvelteKit server. Pass the event's `fetch` so
- * SvelteKit can trace the request. Backend errors come back as `ok: false`
- * with the backend's `{code, message}`; network failures throw.
+ * Call the backend. The app is served from the same origin as the API, so
+ * relative paths work and the session cookie travels automatically.
+ * Backend errors come back as `ok: false` with the backend's `{code, message}`;
+ * network failures throw.
  */
 export async function api<T = unknown>(
-	fetchFn: typeof fetch,
 	path: string,
-	{ method = 'GET', body, token }: ApiOptions = {}
+	{ method = 'GET', body, fetch: fetchFn = fetch }: ApiOptions = {}
 ): Promise<ApiResult<T>> {
 	const headers: Record<string, string> = { accept: 'application/json' };
 	if (body !== undefined) headers['content-type'] = 'application/json';
-	if (token) headers.authorization = `Bearer ${token}`;
 
-	const response = await fetchFn(`${API_URL}${path}`, {
+	const response = await fetchFn(path, {
 		method,
 		headers,
 		body: body === undefined ? undefined : JSON.stringify(body)
@@ -35,7 +31,7 @@ export async function api<T = unknown>(
 
 	if (response.ok) {
 		const data = (response.status === 204 ? undefined : await response.json()) as T;
-		return { ok: true, status: response.status, data, response };
+		return { ok: true, status: response.status, data };
 	}
 
 	let error: ApiErrorBody = { code: 'unknown', message: response.statusText || 'Request failed' };
@@ -47,5 +43,3 @@ export async function api<T = unknown>(
 	}
 	return { ok: false, status: response.status, error };
 }
-
-export { API_URL };

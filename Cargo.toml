@@ -8,9 +8,11 @@ anyhow = "1.0.104"
 argon2 = "0.6.0"
 axum = "0.8.9"
 axum-extra = { version = "0.12.6", features = ["cookie"] }
+axum-vite = "0.3.4"
 base64 = "0.23.1"
 chrono = { version = "0.4.45", features = ["serde"] }
 dotenvy = "0.15.7"
+include_dir = "0.7.4"
 migration = { version = "0.1.0", path = "migration" }
 rand = "0.10.2"
 sea-orm = { version = "2.0.2", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-uuid", "with-chrono"] }
@@ -21,7 +23,7 @@ thiserror = "2.0.20"
 time = "0.3.55"
 tokio = { version = "1.53.1", features = ["full"] }
 tower = "0.5.3"
-tower-http = { version = "0.7.1", features = ["cors", "trace"] }
+tower-http = { version = "0.7.1", features = ["trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.26.0", features = ["v4", "v7", "serde"] }
