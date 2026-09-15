@@ -76,6 +76,7 @@ A release build without `frontend/build` fails early with a message saying so
 | Run the server (and Vite)           | `cargo run`                                                        |
 | Release build with embedded app     | `(cd frontend && npm run build) && cargo build --release`          |
 | Run tests (needs the database)      | `cargo test`                                                       |
+| Regenerate TypeScript bindings only | `cargo test --lib`                                                 |
 | Lint / format                       | `cargo clippy --workspace --all-targets` / `cargo fmt --all`       |
 | Create a migration                  | `sea-orm-cli migrate generate <name>`                              |
 | Apply / roll back migrations        | `sea-orm-cli migrate up` / `sea-orm-cli migrate down`              |
@@ -132,6 +133,32 @@ requests out.
 User objects look like `{id, email, display_name, created_at}`. Unknown
 `/api/*` paths return a JSON `404`; every other unknown path serves the app.
 
+### TypeScript bindings
+
+The request, response and error types the API speaks are Rust structs with
+`#[derive(TS)]` ([ts-rs](https://github.com/Aleph-Alpha/ts-rs)).
+`src/bindings.rs` writes them to `frontend/src/lib/bindings/api.ts`; the
+frontend imports from there and nothing is typed by hand twice.
+
+The file is regenerated
+
+- on every start of a **debug** build (`cargo run`), so it is always current
+  while you develop, and
+- by `cargo test` (or just `cargo test --lib`, which needs no database).
+
+It is committed so the frontend builds without a Rust toolchain (the Docker
+frontend stage runs before Rust); prettier and eslint skip it. Commit it
+together with the Rust change that produced it. A CI step running
+`cargo test --lib && git diff --exit-code frontend/src/lib/bindings` catches a
+forgotten regeneration.
+
+To expose a new type, derive `TS` on it with `#[ts(export_to = "api.ts")]`.
+If it is not reachable from an existing root (a response, request or the
+error body), add it to the list in `src/bindings.rs`. serde attributes such
+as `rename_all` are honoured, so the TypeScript matches the JSON. The error
+`code` is an enum (`ErrorCode`) and arrives in TypeScript as a string union,
+so `switch`ing on it is exhaustive.
+
 ## Frontend
 
 ```sh
@@ -151,6 +178,9 @@ Routes:
 | `/login`     | Login form                                                     |
 | `/register`  | Registration form                                              |
 
+Types shared with the backend come from `src/lib/bindings/api.ts`, generated
+by `cargo test` (see "TypeScript bindings" above). Do not edit that file.
+
 The app is client-rendered (`ssr = false` in `src/routes/+layout.ts`), so
 there are no server hooks, form actions or `+page.server.ts` files. The root
 layout's `load` calls `/api/auth/me` and exposes the user as `data.user`; the
@@ -169,15 +199,16 @@ revalidate and get `304`s rather than skipping the request.
 ```
 migration/          SeaORM migration crate (workspace member)
 build.rs            rebuild when frontend/build changes; refuse release builds without it
-src/main.rs         startup: config, db, migrations, Vite (debug), server
+src/main.rs         startup: config, db, migrations, bindings + Vite (debug), server
 src/lib.rs          module tree + db connection
 src/config.rs       environment configuration
 src/state.rs        shared AppState
-src/error.rs        AppError -> JSON error responses
+src/error.rs        AppError -> JSON error responses; ErrorCode/ErrorBody wire types
 src/extract.rs      JSON extractor with JSON-shaped rejections
+src/bindings.rs     writes the TypeScript bindings (debug startup and cargo test)
 src/frontend.rs     serves the web app: embedded in release, proxied to Vite in debug
 src/auth/           password hashing, db-backed sessions, CurrentUser extractor
-src/routes/         axum routers and handlers (API only)
+src/routes/         axum routers and handlers (API only); request/response types derive TS
 src/entities/       generated SeaORM entities
 tests/              integration tests against a real database
 frontend/           SvelteKit app (see above)

@@ -17,6 +17,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to apply database migrations")?;
 
+    myapp_server::bindings::export_in_debug(&config.frontend_dir);
     let frontend = Frontend::new(&config);
     // Debug builds only: runs `npm run dev` until this handle is dropped.
     let _dev_server = frontend.spawn_dev_server();

@@ -1,7 +1,10 @@
-import type { ApiErrorBody } from '$lib/types';
+import type { ErrorBody, ErrorCode } from '$lib/bindings/api';
+
+/** The backend's error detail, or `unknown` when the response had no JSON error body. */
+export type ApiError = { code: ErrorCode | 'unknown'; message: string };
 
 export type ApiResult<T> =
-	{ ok: true; status: number; data: T } | { ok: false; status: number; error: ApiErrorBody };
+	{ ok: true; status: number; data: T } | { ok: false; status: number; error: ApiError };
 
 type ApiOptions = {
 	method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -34,9 +37,9 @@ export async function api<T = unknown>(
 		return { ok: true, status: response.status, data };
 	}
 
-	let error: ApiErrorBody = { code: 'unknown', message: response.statusText || 'Request failed' };
+	let error: ApiError = { code: 'unknown', message: response.statusText || 'Request failed' };
 	try {
-		const parsed = (await response.json()) as { error?: ApiErrorBody };
+		const parsed = (await response.json()) as Partial<ErrorBody>;
 		if (parsed.error) error = parsed.error;
 	} catch {
 		// Non-JSON error body; keep the fallback.

@@ -8,6 +8,7 @@ use axum_extra::extract::CookieJar;
 use chrono::{DateTime, FixedOffset, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use uuid::Uuid;
 
 use crate::{
@@ -26,14 +27,16 @@ pub fn router() -> Router<AppState> {
         .route("/me", get(me))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export_to = "api.ts")]
 pub struct RegisterRequest {
     pub email: String,
     pub display_name: String,
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export_to = "api.ts")]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
@@ -41,7 +44,8 @@ pub struct LoginRequest {
 
 /// Public view of a user. Never expose `users::Model` directly: it carries the
 /// password hash.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export_to = "api.ts")]
 pub struct UserResponse {
     pub id: Uuid,
     pub email: String,

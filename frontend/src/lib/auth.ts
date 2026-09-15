@@ -1,16 +1,16 @@
 import { api } from '$lib/api';
-import type { User } from '$lib/types';
+import type { LoginRequest, RegisterRequest, UserResponse } from '$lib/bindings/api';
 
 export function me(fetchFn?: typeof fetch) {
-	return api<User>('/api/auth/me', { fetch: fetchFn });
+	return api<UserResponse>('/api/auth/me', { fetch: fetchFn });
 }
 
-export function login(body: { email: string; password: string }) {
-	return api<User>('/api/auth/login', { method: 'POST', body });
+export function login(body: LoginRequest) {
+	return api<UserResponse>('/api/auth/login', { method: 'POST', body });
 }
 
-export function register(body: { email: string; display_name: string; password: string }) {
-	return api<User>('/api/auth/register', { method: 'POST', body });
+export function register(body: RegisterRequest) {
+	return api<UserResponse>('/api/auth/register', { method: 'POST', body });
 }
 
 export function logout() {

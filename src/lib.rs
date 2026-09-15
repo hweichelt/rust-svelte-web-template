@@ -2,6 +2,7 @@
 //! serving the SvelteKit frontend from the same binary.
 
 pub mod auth;
+pub mod bindings;
 pub mod config;
 pub mod entities;
 pub mod error;
