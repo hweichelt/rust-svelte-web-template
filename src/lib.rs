@@ -1,10 +1,13 @@
-//! myapp-server: API backend with database-backed session authentication.
+//! myapp-server: API backend with database-backed session authentication,
+//! serving the SvelteKit frontend from the same binary.
 
 pub mod auth;
+pub mod bindings;
 pub mod config;
 pub mod entities;
 pub mod error;
 pub mod extract;
+pub mod frontend;
 pub mod routes;
 pub mod state;
 

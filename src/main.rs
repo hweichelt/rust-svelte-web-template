@@ -1,6 +1,6 @@
 use anyhow::Context;
 use migration::{Migrator, MigratorTrait};
-use myapp_server::{config::Config, routes, state::AppState};
+use myapp_server::{config::Config, frontend::Frontend, routes, state::AppState};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -17,8 +17,13 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to apply database migrations")?;
 
+    myapp_server::bindings::export_in_debug(&config.frontend_dir);
+    let frontend = Frontend::new(&config);
+    // Debug builds only: runs `npm run dev` until this handle is dropped.
+    let _dev_server = frontend.spawn_dev_server();
+
     let state = AppState::new(db, config.clone());
-    let app = routes::router(state)?;
+    let app = routes::router(state).merge(frontend.router());
 
     let listener = TcpListener::bind(config.bind_addr)
         .await

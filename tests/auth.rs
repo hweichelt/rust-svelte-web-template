@@ -10,15 +10,24 @@ use http_body_util::BodyExt;
 use migration::{Migrator, MigratorTrait};
 use myapp_server::{config::Config, routes, state::AppState};
 use serde_json::{Value, json};
+use tokio::sync::OnceCell;
 use tower::ServiceExt;
 use uuid::Uuid;
+
+/// Tests run in parallel; apply migrations once per process rather than
+/// racing to create the same tables on a fresh database.
+static MIGRATED: OnceCell<()> = OnceCell::const_new();
 
 async fn app() -> Router {
     dotenvy::dotenv().ok();
     let config = Config::from_env().expect("config");
     let db = myapp_server::connect_db(&config).await.expect("db");
-    Migrator::up(&db, None).await.expect("migrations");
-    routes::router(AppState::new(db, config)).expect("router")
+    MIGRATED
+        .get_or_init(|| async {
+            Migrator::up(&db, None).await.expect("migrations");
+        })
+        .await;
+    routes::router(AppState::new(db, config))
 }
 
 async fn send(app: &Router, req: Request<Body>) -> (StatusCode, Option<String>, Value) {
@@ -203,6 +212,14 @@ async fn rejects_invalid_input() {
     let (status, _, res) = send(&app, get("/api/auth/me", None)).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert_eq!(res["error"]["code"], "unauthorized");
+}
+
+#[tokio::test]
+async fn unknown_api_path_is_json_404() {
+    let app = app().await;
+    let (status, _, body) = send(&app, get("/api/nope", None)).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["error"]["code"], "not_found");
 }
 
 #[tokio::test]
